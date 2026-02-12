@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HR 萬能抽籤分組大師</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --accent-color: #00d2ff;
+            --glass: rgba(255, 255, 255, 0.9);
+            --text-main: #2d3436;
+        }
+
+        body {
+            font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+            background: #f0f2f5;
+            background-image: radial-gradient(#d2d6db 1px, transparent 1px);
+            background-size: 20px 20px;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            color: var(--text-main);
+        }
+
+        .app-container {
+            width: 95%;
+            max-width: 1000px;
+            margin: 40px 0;
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+
+        /* 標題與頁籤 */
+        header {
+            background: var(--primary-gradient);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .tabs {
+            display: flex;
+            background: #fff;
+            border-bottom: 1px solid #eee;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            color: #777;
+            transition: 0.3s;
+        }
+
+        .tab-btn.active {
+            color: #764ba2;
+            border-bottom: 3px solid #764ba2;
+        }
+
+        .content-section {
+            display: none;
+            padding: 30px;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .content-section.active { display: block; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* 卡片與元件風格 */
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 120px;
+            border: 2px solid #edf2f7;
+            border-radius: 10px;
+            padding: 15px;
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+
+        textarea:focus { border-color: #764ba2; outline: none; }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .btn-primary { background: var(--primary-gradient); color: white; }
+        .btn-outline { border: 2px solid #764ba2; color: #764ba2; background: transparent; }
+        .btn-danger { background: #ff7675; color: white; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); opacity: 0.9; }
+
+        /* 抽籤展示區 */
+        #display-box {
+            height: 180px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #2d3436;
+            color: var(--accent-color);
+            font-size: 60px;
+            font-weight: 800;
+            border-radius: 15px;
+            margin: 20px 0;
+            text-shadow: 0 0 20px rgba(0,210,255,0.5);
+            border: 4px solid #3d4446;
+        }
+
+        /* 分組結果視覺化 */
+        .group-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .group-card {
+            background: linear-gradient(145deg, #ffffff, #f0f2f5);
+            border-left: 5px solid #764ba2;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        }
+
+        .group-card h4 { margin: 0 0 10px 0; color: #764ba2; }
+
+        .badge {
+            background: #ffeaa7;
+            color: #d63031;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-left: 5px;
+        }
+
+        .history-list {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #636e72;
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <header>
+        <h1><i class="fas fa-gift"></i> HR 萬能抽籤分組大師</h1>
+        <p>專業、快速、公平的自動化名單工具</p>
+    </header>
+
+    <nav class="tabs">
+        <button class="tab-btn active" onclick="openTab('tab-setup')"><i class="fas fa-users-cog"></i> 名單設定</button>
+        <button class="tab-btn" onclick="openTab('tab-draw')"><i class="fas fa-trophy"></i> 幸運抽籤</button>
+        <button class="tab-btn" onclick="openTab('tab-group')"><i class="fas fa-layer-group"></i> 自動分組</button>
+    </nav>
+
+    <div id="tab-setup" class="content-section active">
+        <div class="card">
+            <h3><i class="fas fa-file-import"></i> 匯入名單來源</h3>
+            <div style="margin-bottom: 15px;">
+                <button class="btn btn-outline" onclick="generateMockData()">載入模擬名單</button>
+                <input type="file" id="csv-upload" style="display:none" accept=".csv">
+                <button class="btn btn-outline" onclick="document.getElementById('csv-upload').click()">上傳 CSV</button>
+                <button class="btn btn-danger" id="clean-btn" style="display:none" onclick="removeDuplicates()">移除重複項</button>
+            </div>
+            <textarea id="raw-input" placeholder="請手動輸入姓名，用換行或逗號隔開..."></textarea>
+            <div id="status-bar" style="margin-top:10px; font-weight:bold;"></div>
+            <div id="preview-area" style="margin-top:10px; color:#777; font-size: 14px; line-height: 1.6;"></div>
+        </div>
+    </div>
+
+    <div id="tab-draw" class="content-section">
+        <div class="card">
+            <div id="display-box">READY?</div>
+            <div style="text-align:center; margin-bottom: 20px;">
+                <label style="margin-right:20px;"><input type="checkbox" id="repeat-draw"> 允許重複中獎</label>
+                <button class="btn btn-primary" onclick="startLuckyDraw()" style="padding: 15px 40px; font-size: 18px;">
+                    <i class="fas fa-play"></i> 開始抽獎
+                </button>
+            </div>
+            <div class="history-list">
+                <strong><i class="fas fa-history"></i> 本次中獎紀錄：</strong>
+                <div id="winner-history">尚未有人中獎</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-group" class="content-section">
+        <div class="card">
+            <div style="margin-bottom: 20px;">
+                每組設定幾人：<input type="number" id="group-num" value="3" min="1" style="width:60px; padding:8px; border-radius:5px; border:1px solid #ddd;">
+                <button class="btn btn-primary" onclick="doGrouping()"><i class="fas fa-dice"></i> 執行隨機分組</button>
+                <button class="btn btn-outline" onclick="exportGroupCSV()"><i class="fas fa-download"></i> 下載結果</button>
+            </div>
+            <div id="group-display" class="group-grid">
+                </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let names = [];
+    let history = [];
+    let groupResults = [];
+
+    // 分頁切換
+    function openTab(tabId) {
+        document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        event.currentTarget.classList.add('active');
+    }
+
+    // 名單處理與重複偵測
+    const inputEl = document.getElementById('raw-input');
+    inputEl.addEventListener('input', processNames);
+
+    function processNames() {
+        const val = inputEl.value;
+        names = val.split(/[\n,，\s]+/).filter(n => n.trim() !== "");
+        renderPreview();
+    }
+
+    function renderPreview() {
+        const preview = document.getElementById('preview-area');
+        const cleanBtn = document.getElementById('clean-btn');
+        const statusBar = document.getElementById('status-bar');
+        
+        const seen = new Set();
+        const duplicates = new Set();
+        preview.innerHTML = "目前名單：";
+        
+        names.forEach(n => {
+            const span = document.createElement('span');
+            span.textContent = n + " ";
+            if (seen.has(n)) {
+                span.className = "badge";
+                duplicates.add(n);
+            }
+            seen.add(n);
+            preview.appendChild(span);
+        });
+
+        statusBar.innerHTML = `總人數：${names.length} 人 | 重複：<span style="color:red">${duplicates.size}</span>`;
+        cleanBtn.style.display = duplicates.size > 0 ? "inline-flex" : "none";
+    }
+
+    function removeDuplicates() {
+        names = [...new Set(names)];
+        inputEl.value = names.join('\n');
+        processNames();
+    }
+
+    function generateMockData() {
+        const mock = ["陳大文", "林志玲", "周杰倫", "蔡依林", "王小明", "李曉華", "張君雅", "林志玲", "陳大文", "金城武", "彭于晏", "桂綸鎂"];
+        inputEl.value = mock.join('\n');
+        processNames();
+    }
+
+    // CSV 處理
+    document.getElementById('csv-upload').addEventListener('change', (e) => {
+        Papa.parse(e.target.files[0], {
+            complete: (res) => {
+                const uploaded = res.data.flat().filter(n => n.trim() !== "");
+                inputEl.value = uploaded.join('\n');
+                processNames();
+            }
+        });
+    });
+
+    // 抽籤邏輯
+    let isDrawing = false;
+    function startLuckyDraw() {
+        if (isDrawing || names.length === 0) return;
+        isDrawing = true;
+        const box = document.getElementById('display-box');
+        let count = 0;
+        
+        const timer = setInterval(() => {
+            box.textContent = names[Math.floor(Math.random() * names.length)];
+            count++;
+            if (count > 20) {
+                clearInterval(timer);
+                finishDraw();
+            }
+        }, 60);
+    }
+
+    function finishDraw() {
+        const isRepeat = document.getElementById('repeat-draw').checked;
+        const idx = Math.floor(Math.random() * names.length);
+        const winner = names[idx];
+        
+        document.getElementById('display-box').textContent = winner;
+        history.push(winner);
+        document.getElementById('winner-history').textContent = history.join(', ');
+
+        // 煙火
+        confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 }, colors: ['#00d2ff', '#764ba2', '#ff7675'] });
+
+        if (!isRepeat) {
+            names.splice(idx, 1);
+            inputEl.value = names.join('\n');
+            processNames();
+        }
+        isDrawing = false;
+    }
+
+    // 分組邏輯
+    function doGrouping() {
+        if (names.length === 0) return;
+        const size = parseInt(document.getElementById('group-num').value);
+        const shuffled = [...names].sort(() => Math.random() - 0.5);
+        groupResults = [];
+        
+        for (let i = 0; i < shuffled.length; i += size) {
+            groupResults.push(shuffled.slice(i, i + size));
+        }
+        renderGroupUI();
+    }
+
+    function renderGroupUI() {
+        const container = document.getElementById('group-display');
+        container.innerHTML = "";
+        groupResults.forEach((g, i) => {
+            const div = document.createElement('div');
+            div.className = "group-card";
+            div.innerHTML = `<h4>第 ${i+1} 組 (${g.length}人)</h4>` + g.join('、');
+            container.appendChild(div);
+        });
+    }
+
+    function exportGroupCSV() {
+        if (groupResults.length === 0) return;
+        let csv = "\ufeff組別,成員\n";
+        groupResults.forEach((g, i) => csv += `第${i+1}組,"${g.join(',')}"\n`);
+        const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = "HR分組結果.csv";
+        link.click();
+    }
+</script>
+
+</body>
+</html>
